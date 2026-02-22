@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Replace 'cc-browser' with your actual repository name
+// Using relative base path to make it work on any GitHub Pages subfolder
 export default defineConfig({
   plugins: [react()],
-  base: '/cc-browser/', 
+  base: './', 
 })

@@ -6,20 +6,48 @@ import { AssetManager } from './engine/AssetManager';
 
 const App: FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const assets = useMemo(() => new AssetManager(), []);
-  const [engine, setEngine] = useState(() => new GameEngine(Math.max(800, window.innerWidth - 250), Math.max(600, window.innerHeight)));
+  const assets = useMemo(() => {
+    try {
+      return new AssetManager();
+    } catch (e) {
+      console.error('AssetManager Init Error:', e);
+      return null;
+    }
+  }, []);
+  
+  const [engine, setEngine] = useState(() => {
+    try {
+      return new GameEngine(Math.max(800, window.innerWidth - 250), Math.max(600, window.innerHeight));
+    } catch (e) {
+      console.error('GameEngine Init Error:', e);
+      return null;
+    }
+  });
+
   const [selectionBox, setSelectionBox] = useState<{ start: Vector2, end: Vector2 } | null>(null);
   const [, setTick] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const restartGame = useCallback(() => {
+    if (!engine) return;
     setEngine(new GameEngine(Math.max(800, window.innerWidth - 250), Math.max(600, window.innerHeight)));
-  }, []);
+  }, [engine]);
 
   useEffect(() => {
+    if (!engine) {
+       setError("Game Engine failed to initialize. Check browser console.");
+       return;
+    }
+
     const loop = () => {
-      engine.update();
-      setTick(t => t + 1);
-      requestAnimationFrame(loop);
+      try {
+        engine.update();
+        setTick(t => t + 1);
+        requestAnimationFrame(loop);
+      } catch (e: any) {
+        console.error('Game Loop Error:', e);
+        setError(e.message);
+      }
     };
     const id = requestAnimationFrame(loop);
     return () => cancelAnimationFrame(id);
@@ -27,115 +55,121 @@ const App: FC = () => {
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas || !engine || !assets) return;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    
-    const tileSize = engine.map.tileSize;
+    try {
+      ctx.imageSmoothingEnabled = false;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      const tileSize = engine.map.tileSize;
 
-    // 1. Render Terrain Tiles
-    for(let y=0; y<engine.map.height; y++) {
-      for(let x=0; x<engine.map.width; x++) {
-        const tile = engine.map.tiles[y][x];
-        let img = assets.images['grass'];
-        if (tile === TerrainType.WATER) img = assets.images['water'];
-        else if (tile === TerrainType.ROAD) img = assets.images['road'];
-        else if (tile === TerrainType.CLIFF) img = assets.images['sand'];
-        else if (tile === TerrainType.VILLAGE) img = assets.images['village'];
-        else if (tile === TerrainType.BRIDGE) img = assets.images['road'];
-        
-        ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
-        
-        if (tile === TerrainType.TREE) {
-           ctx.drawImage(assets.images['grass'], x * tileSize, y * tileSize, tileSize, tileSize);
-           ctx.fillStyle = '#0f290b';
-           ctx.beginPath(); ctx.arc(x * tileSize + 16, y * tileSize + 16, 10, 0, Math.PI*2); ctx.fill();
+      // 1. Render Terrain Tiles
+      for(let y=0; y<engine.map.height; y++) {
+        for(let x=0; x<engine.map.width; x++) {
+          const tile = engine.map.tiles[y][x];
+          let img = assets.images['grass'];
+          if (tile === TerrainType.WATER) img = assets.images['water'];
+          else if (tile === TerrainType.ROAD) img = assets.images['road'];
+          else if (tile === TerrainType.CLIFF) img = assets.images['sand'];
+          else if (tile === TerrainType.VILLAGE) img = assets.images['village'];
+          else if (tile === TerrainType.BRIDGE) img = assets.images['road'];
+          
+          if (img) ctx.drawImage(img, x * tileSize, y * tileSize, tileSize, tileSize);
+          
+          if (tile === TerrainType.TREE) {
+             const gImg = assets.images['grass'];
+             if (gImg) ctx.drawImage(gImg, x * tileSize, y * tileSize, tileSize, tileSize);
+             ctx.fillStyle = '#0f290b';
+             ctx.beginPath(); ctx.arc(x * tileSize + 16, y * tileSize + 16, 10, 0, Math.PI*2); ctx.fill();
+          }
         }
       }
-    }
 
-    // 2. Render Units
-    engine.units.forEach(u => {
-      const tx = Math.floor(u.pos.x / tileSize);
-      const ty = Math.floor(u.pos.y / tileSize);
-      if (ty >= 0 && ty < engine.map.height && tx >= 0 && tx < engine.map.width) {
-        if (engine.map.shroud[ty][tx]) return;
-      }
-
-      ctx.save();
-      ctx.translate(u.pos.x, u.pos.y);
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      ctx.fillRect(-10, 8, 20, 10);
-
-      ctx.save();
-      ctx.rotate(u.angle);
-      let bodyImg = u.side === 'GDI' ? assets.images['gdi_humvee'] : assets.images['nod_buggy'];
-      if (u.type === 'medium_tank') bodyImg = assets.images['gdi_tank_body'];
-      else if (u.type === 'apc') bodyImg = assets.images['gdi_apc'];
-      else if (u.type === 'nod_light_tank') bodyImg = assets.images['nod_tank_body'];
-      else if (u.type === 'nod_turret') bodyImg = assets.images['nod_turret_base'];
-      else if (u.type.includes('infantry') || u.type === 'minigunner') bodyImg = u.side === 'GDI' ? assets.images['gdi_infantry'] : assets.images['nod_infantry'];
-
-      ctx.drawImage(bodyImg, -bodyImg.width/2, -bodyImg.height/2);
-      ctx.restore();
-
-      if (u.type.includes('tank') || u.type === 'nod_turret') {
-        ctx.save();
-        ctx.rotate(u.turretAngle || u.angle);
-        const turretImg = u.side === 'GDI' ? assets.images['gdi_tank_turret'] : (u.type === 'nod_turret' ? assets.images['nod_turret_gun'] : assets.images['nod_tank_turret']);
-        ctx.drawImage(turretImg, -turretImg.width/2, -turretImg.height/2);
-        ctx.restore();
-      }
-
-      if (u.isSelected) {
-        ctx.strokeStyle = '#0f0';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(-20, -20, 40, 40);
-      }
-      ctx.restore();
-
-      const hpWidth = 30;
-      ctx.fillStyle = '#000';
-      ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, hpWidth, 4);
-      const hpPercent = u.health / (u.type === 'medium_tank' ? 400 : (u.type === 'apc' ? 300 : 100));
-      ctx.fillStyle = hpPercent > 0.5 ? '#0f0' : (hpPercent > 0.2 ? '#ff0' : '#f00');
-      ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, Math.max(0, hpPercent * hpWidth), 4);
-    });
-
-    // 3. Shroud
-    ctx.fillStyle = '#000';
-    for(let y=0; y<engine.map.height; y++) {
-      for(let x=0; x<engine.map.width; x++) {
-        if (engine.map.shroud[y][x]) {
-          ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
-        }
-      }
-    }
-
-    // 4. Projectiles
-    engine.projectiles.forEach(p => {
-       const tx = Math.floor(p.pos.x / tileSize);
-       const ty = Math.floor(p.pos.y / tileSize);
-       if (ty >= 0 && ty < engine.map.height && tx >= 0 && tx < engine.map.width) {
+      // 2. Render Units
+      engine.units.forEach(u => {
+        const tx = Math.floor(u.pos.x / tileSize);
+        const ty = Math.floor(u.pos.y / tileSize);
+        if (ty >= 0 && ty < engine.map.height && tx >= 0 && tx < engine.map.width) {
           if (engine.map.shroud[ty][tx]) return;
-       }
-       ctx.fillStyle = p.type === 'shell' ? '#fb0' : '#fff';
-       ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, p.type === 'shell' ? 3 : 1.5, 0, Math.PI*2); ctx.fill();
-    });
+        }
 
-    if (selectionBox) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-      ctx.setLineDash([5, 5]);
-      ctx.strokeRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
-      ctx.setLineDash([]);
+        ctx.save();
+        ctx.translate(u.pos.x, u.pos.y);
+        ctx.fillStyle = 'rgba(0,0,0,0.3)';
+        ctx.fillRect(-10, 8, 20, 10);
+
+        ctx.save();
+        ctx.rotate(u.angle);
+        let bodyImg = u.side === 'GDI' ? assets.images['gdi_humvee'] : assets.images['nod_buggy'];
+        if (u.type === 'medium_tank') bodyImg = assets.images['gdi_tank_body'];
+        else if (u.type === 'apc') bodyImg = assets.images['gdi_apc'];
+        else if (u.type === 'nod_light_tank') bodyImg = assets.images['nod_tank_body'];
+        else if (u.type === 'nod_turret') bodyImg = assets.images['nod_turret_base'];
+        else if (u.type.includes('infantry') || u.type === 'minigunner') bodyImg = u.side === 'GDI' ? assets.images['gdi_infantry'] : assets.images['nod_infantry'];
+
+        if (bodyImg) ctx.drawImage(bodyImg, -bodyImg.width/2, -bodyImg.height/2);
+        ctx.restore();
+
+        if (u.type.includes('tank') || u.type === 'nod_turret') {
+          ctx.save();
+          ctx.rotate(u.turretAngle || u.angle);
+          const turretImg = u.side === 'GDI' ? assets.images['gdi_tank_turret'] : (u.type === 'nod_turret' ? assets.images['nod_turret_gun'] : assets.images['nod_tank_turret']);
+          if (turretImg) ctx.drawImage(turretImg, -turretImg.width/2, -turretImg.height/2);
+          ctx.restore();
+        }
+
+        if (u.isSelected) {
+          ctx.strokeStyle = '#0f0';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(-20, -20, 40, 40);
+        }
+        ctx.restore();
+
+        const hpWidth = 30;
+        ctx.fillStyle = '#000';
+        ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, hpWidth, 4);
+        const hpPercent = u.health / (u.type === 'medium_tank' ? 400 : (u.type === 'apc' ? 300 : 100));
+        ctx.fillStyle = hpPercent > 0.5 ? '#0f0' : (hpPercent > 0.2 ? '#ff0' : '#f00');
+        ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, Math.max(0, hpPercent * hpWidth), 4);
+      });
+
+      // 3. Shroud
+      ctx.fillStyle = '#000';
+      for(let y=0; y<engine.map.height; y++) {
+        for(let x=0; x<engine.map.width; x++) {
+          if (engine.map.shroud[y][x]) {
+            ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+          }
+        }
+      }
+
+      // 4. Projectiles
+      engine.projectiles.forEach(p => {
+         const tx = Math.floor(p.pos.x / tileSize);
+         const ty = Math.floor(p.pos.y / tileSize);
+         if (ty >= 0 && ty < engine.map.height && tx >= 0 && tx < engine.map.width) {
+            if (engine.map.shroud[ty][tx]) return;
+         }
+         ctx.fillStyle = p.type === 'shell' ? '#fb0' : '#fff';
+         ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, p.type === 'shell' ? 3 : 1.5, 0, Math.PI*2); ctx.fill();
+      });
+
+      if (selectionBox) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(selectionBox.start.x, selectionBox.start.y, selectionBox.end.x - selectionBox.start.x, selectionBox.end.y - selectionBox.start.y);
+        ctx.setLineDash([]);
+      }
+    } catch (e: any) {
+      console.error('Render Error:', e);
+      setError('Render Error: ' + e.message);
     }
-  }, [engine.units, engine.projectiles, engine.map, selectionBox, assets]);
+  }, [engine, assets, selectionBox]);
 
   const handleMouseDown = (e: MouseEvent) => {
-    if (engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
+    if (!engine || engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
@@ -150,14 +184,14 @@ const App: FC = () => {
     }
   };
   const handleMouseUp = () => {
-    if (selectionBox) {
+    if (selectionBox && engine) {
       engine.selectUnitsInBox(selectionBox.start, selectionBox.end);
       setSelectionBox(null);
     }
   };
   const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault();
-    if (engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
+    if (!engine || engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
     const x = e.clientX - rect.left;
@@ -166,6 +200,18 @@ const App: FC = () => {
     if (clickedUnit && clickedUnit.side === 'NOD') engine.issueAttackCommand(clickedUnit);
     else engine.issueMoveCommand({ x, y });
   };
+
+  if (error) {
+    return (
+      <div style={{ color: 'red', padding: '20px', background: '#000', height: '100vh', fontFamily: 'monospace' }}>
+        <h1>CRITICAL ERROR</h1>
+        <pre>{error}</pre>
+        <button onClick={() => window.location.reload()} style={{ padding: '10px 20px', cursor: 'pointer' }}>RELOAD</button>
+      </div>
+    );
+  }
+
+  if (!engine || !assets) return <div style={{ color: '#fff', padding: '20px' }}>Initializing engine...</div>;
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', backgroundColor: '#000', userSelect: 'none', fontFamily: 'monospace' }}>
@@ -181,7 +227,6 @@ const App: FC = () => {
           style={{ cursor: 'crosshair', imageRendering: 'pixelated', backgroundColor: '#000' }}
         />
         
-        {/* Mission Accomplished / Failed Overlay */}
         {(engine.missionState === 'WIN' || engine.missionState === 'LOSS') && (
           <div style={{
             position: 'absolute',
