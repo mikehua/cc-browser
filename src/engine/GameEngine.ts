@@ -18,23 +18,19 @@ export class GameEngine {
     this.height = height;
     this.map = new GameMap(Math.floor(width / 32), Math.floor(height / 32), 32);
 
-    // Initial GDI Force (South West)
     this.spawnUnit('apc', 'GDI', { x: 50, y: height - 100 });
     this.spawnUnit('humvee', 'GDI', { x: 80, y: height - 150 });
     this.spawnUnit('minigunner', 'GDI', { x: 120, y: height - 120 });
     this.spawnUnit('minigunner', 'GDI', { x: 120, y: height - 100 });
 
-    // Nod Ambush: Bridge Guard (Center)
     const bridgeX = Math.floor(width * 0.4);
     const bridgeY = Math.floor(height * 0.5);
     this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY - 50 });
     this.spawnUnit('nod_rocket_infantry', 'NOD', { x: bridgeX + 200, y: bridgeY - 100 });
 
-    // Nod Ambush: North Village
     this.spawnUnit('nod_buggy', 'NOD', { x: Math.floor(width * 0.3), y: Math.floor(height * 0.25) });
     this.spawnUnit('minigunner', 'NOD', { x: Math.floor(width * 0.35), y: Math.floor(height * 0.2) });
 
-    // Nod Defense: Main Bialystok Town (Far East)
     const townX = Math.floor(width * 0.8);
     const townY = Math.floor(height * 0.6);
     this.spawnUnit('nod_light_tank', 'NOD', { x: townX - 50, y: townY - 50 });
@@ -89,14 +85,12 @@ export class GameEngine {
   }
 
   checkObjectives() {
-    // Primary Objective: Destroy all Nod units
     const nodAlive = this.units.some(u => u.side === 'NOD');
     if (!nodAlive && this.units.some(u => u.side === 'GDI')) {
        this.missionState = 'WIN';
        return;
     }
 
-    // Secondary Event: Reinforcements when reaching town
     if (this.missionState === 'START') {
       const townX = this.width * 0.8;
       const townY = this.height * 0.6;
@@ -131,14 +125,21 @@ export class GameEngine {
   }
 
   issueMoveCommand(pos: Vector2) {
-    this.units.filter(u => u.isSelected).forEach(u => {
-      const path = Pathfinder.findPath(this.map, u.pos, pos);
-      if (path.length > 0) {
-        u.path = path;
+    const selected = this.units.filter(u => u.isSelected);
+    if (selected.length === 0) return;
+
+    // Calculate path ONCE for the whole group (using the first unit as start)
+    const firstUnit = selected[0];
+    const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, pos);
+
+    selected.forEach(u => {
+      if (groupPath.length > 0) {
+        // Clone the group path for each unit so they can shift separately
+        u.path = [...groupPath];
         u.targetPos = undefined;
         u.targetUnit = undefined;
       } else {
-        // Fallback to simple move if pathfinder fails
+        // Simple fallback
         u.targetPos = { ...pos };
         u.path = [];
         u.targetUnit = undefined;
@@ -147,13 +148,17 @@ export class GameEngine {
   }
 
   issueAttackCommand(target: Unit) {
-    this.units.filter(u => u.isSelected).forEach(u => {
+    const selected = this.units.filter(u => u.isSelected);
+    if (selected.length === 0) return;
+
+    // Path to target once
+    const firstUnit = selected[0];
+    const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, target.pos);
+
+    selected.forEach(u => {
       u.targetUnit = target;
       u.targetPos = undefined;
-      const path = Pathfinder.findPath(this.map, u.pos, target.pos);
-      if (path.length > 0) {
-        u.path = path;
-      }
+      if (groupPath.length > 0) u.path = [...groupPath];
     });
   }
 

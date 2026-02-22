@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Using relative base path to make it work on any GitHub Pages subfolder
+// Relative base path ensures portability on Cloudflare Pages
 export default defineConfig({
   plugins: [react()],
   base: './', 
