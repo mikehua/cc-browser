@@ -1,10 +1,10 @@
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback, FC, MouseEvent } from 'react';
 import { GameEngine } from './engine/GameEngine';
 import { Vector2 } from './engine/Unit';
 import { TerrainType } from './engine/Map';
 import { AssetManager } from './engine/AssetManager';
 
-const App: React.FC = () => {
+const App: FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const assets = useMemo(() => new AssetManager(), []);
   const [engine, setEngine] = useState(() => new GameEngine(Math.max(800, window.innerWidth - 250), Math.max(600, window.innerHeight)));
@@ -134,7 +134,7 @@ const App: React.FC = () => {
     }
   }, [engine.units, engine.projectiles, engine.map, selectionBox, assets]);
 
-  const handleMouseDown = (e: React.MouseEvent) => {
+  const handleMouseDown = (e: MouseEvent) => {
     if (engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return;
@@ -142,7 +142,7 @@ const App: React.FC = () => {
     const y = e.clientY - rect.top;
     if (e.button === 0) setSelectionBox({ start: { x, y }, end: { x, y } });
   };
-  const handleMouseMove = (e: React.MouseEvent) => {
+  const handleMouseMove = (e: MouseEvent) => {
     if (selectionBox) {
       const rect = canvasRef.current?.getBoundingClientRect();
       if (!rect) return;
@@ -155,7 +155,7 @@ const App: React.FC = () => {
       setSelectionBox(null);
     }
   };
-  const handleContextMenu = (e: React.MouseEvent) => {
+  const handleContextMenu = (e: MouseEvent) => {
     e.preventDefault();
     if (engine.missionState === 'WIN' || engine.missionState === 'LOSS') return;
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -194,8 +194,7 @@ const App: React.FC = () => {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            zIndex: 100,
-            animation: 'fadeIn 1s ease-out'
+            zIndex: 100
           }}>
             <h1 style={{ 
               color: engine.missionState === 'WIN' ? '#d4af37' : '#f00', 
@@ -221,8 +220,6 @@ const App: React.FC = () => {
                 fontWeight: 'bold',
                 textTransform: 'uppercase'
               }}
-              onMouseOver={(e) => (e.currentTarget.style.backgroundColor = '#444')}
-              onMouseOut={(e) => (e.currentTarget.style.backgroundColor = '#333')}
             >
               Restart Mission
             </button>
