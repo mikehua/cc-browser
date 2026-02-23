@@ -74,6 +74,8 @@ const App: FC = () => {
       if (mapCanvasRef.current) ctx.drawImage(mapCanvasRef.current, 0, 0);
 
       const tileSize = engine.map.tileSize;
+      
+      // 1. Draw Units
       engine.units.forEach(u => {
         const tx = Math.floor(u.pos.x / tileSize);
         const ty = Math.floor(u.pos.y / tileSize);
@@ -112,7 +114,7 @@ const App: FC = () => {
         ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, Math.max(0, hpPercent * hpWidth), 4);
       });
 
-      // 5. Draw Projectiles
+      // 2. Draw Projectiles
       engine.projectiles.forEach(p => {
         const tx = Math.floor(p.pos.x / tileSize);
         const ty = Math.floor(p.pos.y / tileSize);
@@ -125,11 +127,21 @@ const App: FC = () => {
         ctx.fill();
       });
 
-      // 6. Draw Shroud
+      // 3. Draw Shroud
+      ctx.fillStyle = '#000';
+      for(let y=0; y<engine.map.height; y++) {
+        for(let x=0; x<engine.map.width; x++) {
+          if (engine.map.shroud[y][x]) ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+        }
+      }
+
+      // 4. Draw Pings
+      pings.forEach(p => {
         ctx.strokeStyle = `rgba(0, 255, 0, ${p.life / 20})`;
         ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, (20 - p.life) * 2, 0, Math.PI * 2); ctx.stroke();
       });
 
+      // 5. Selection Box
       if (selectionBox) {
         ctx.strokeStyle = 'rgba(255,255,255,0.8)';
         ctx.setLineDash([5, 5]);
