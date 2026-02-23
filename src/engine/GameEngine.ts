@@ -28,9 +28,6 @@ export class GameEngine {
     this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY - 50 });
     this.spawnUnit('nod_rocket_infantry', 'NOD', { x: bridgeX + 200, y: bridgeY - 100 });
 
-    this.spawnUnit('nod_buggy', 'NOD', { x: Math.floor(width * 0.3), y: Math.floor(height * 0.25) });
-    this.spawnUnit('minigunner', 'NOD', { x: Math.floor(width * 0.35), y: Math.floor(height * 0.2) });
-
     const townX = Math.floor(width * 0.8);
     const townY = Math.floor(height * 0.6);
     this.spawnUnit('nod_light_tank', 'NOD', { x: townX - 50, y: townY - 50 });
@@ -53,12 +50,12 @@ export class GameEngine {
     this.projectiles.push(proj);
   }
 
-  update() {
+  update(dt: number) {
     this.units = this.units.filter(u => u.health > 0);
-    this.units.forEach(u => u.update(this.units, this));
+    this.units.forEach(u => u.update(this.units, this, dt));
 
     this.projectiles.forEach(p => {
-      p.update();
+      p.update(dt);
       if (p.isDead) {
         const target = this.units.find(u => {
            const dx = u.pos.x - p.pos.x;
@@ -127,19 +124,14 @@ export class GameEngine {
   issueMoveCommand(pos: Vector2) {
     const selected = this.units.filter(u => u.isSelected);
     if (selected.length === 0) return;
-
-    // Calculate path ONCE for the whole group (using the first unit as start)
     const firstUnit = selected[0];
     const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, pos);
-
     selected.forEach(u => {
       if (groupPath.length > 0) {
-        // Clone the group path for each unit so they can shift separately
         u.path = [...groupPath];
         u.targetPos = undefined;
         u.targetUnit = undefined;
       } else {
-        // Simple fallback
         u.targetPos = { ...pos };
         u.path = [];
         u.targetUnit = undefined;
@@ -150,11 +142,8 @@ export class GameEngine {
   issueAttackCommand(target: Unit) {
     const selected = this.units.filter(u => u.isSelected);
     if (selected.length === 0) return;
-
-    // Path to target once
     const firstUnit = selected[0];
     const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, target.pos);
-
     selected.forEach(u => {
       u.targetUnit = target;
       u.targetPos = undefined;

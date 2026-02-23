@@ -20,17 +20,18 @@ export class Projectile {
     this.type = type;
   }
 
-  update() {
+  update(dt: number) {
     const dx = this.targetPos.x - this.pos.x;
     const dy = this.targetPos.y - this.pos.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
+    const moveDist = this.speed * dt * 60; // Base speed scale to 60fps
 
-    if (dist < this.speed) {
+    if (dist < moveDist) {
       this.pos = { ...this.targetPos };
       this.isDead = true;
     } else {
-      this.pos.x += (dx / dist) * this.speed;
-      this.pos.y += (dy / dist) * this.speed;
+      this.pos.x += (dx / dist) * moveDist;
+      this.pos.y += (dy / dist) * moveDist;
     }
   }
 }

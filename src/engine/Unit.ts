@@ -10,20 +10,20 @@ export interface UnitStats {
   speed: number;
   range: number;
   damage: number;
-  fireRate: number; // Frames between shots
-  armor: number; // 0: None, 1: Light, 2: Heavy, 3: Concrete
+  fireRate: number;
+  armor: number;
   viewRange: number;
 }
 
 export const UNIT_STATS: Record<UnitType, UnitStats> = {
-  'minigunner': { maxHealth: 50, speed: 1.2, range: 120, damage: 8, fireRate: 30, armor: 0, viewRange: 150 },
-  'humvee': { maxHealth: 150, speed: 4.0, range: 160, damage: 12, fireRate: 40, armor: 1, viewRange: 220 },
-  'medium_tank': { maxHealth: 400, speed: 2.2, range: 200, damage: 40, fireRate: 90, armor: 2, viewRange: 180 },
-  'apc': { maxHealth: 300, speed: 3.5, range: 140, damage: 10, fireRate: 25, armor: 3, viewRange: 180 },
-  'nod_buggy': { maxHealth: 120, speed: 4.5, range: 140, damage: 10, fireRate: 25, armor: 1, viewRange: 200 },
-  'nod_light_tank': { maxHealth: 300, speed: 2.8, range: 180, damage: 30, fireRate: 75, armor: 2, viewRange: 180 },
-  'nod_rocket_infantry': { maxHealth: 45, speed: 1.0, range: 220, damage: 25, fireRate: 65, armor: 0, viewRange: 160 },
-  'nod_turret': { maxHealth: 400, speed: 0, range: 250, damage: 50, fireRate: 100, armor: 4, viewRange: 250 },
+  'minigunner': { maxHealth: 50, speed: 60, range: 120, damage: 8, fireRate: 0.5, armor: 0, viewRange: 150 },
+  'humvee': { maxHealth: 150, speed: 200, range: 160, damage: 12, fireRate: 0.6, armor: 1, viewRange: 220 },
+  'medium_tank': { maxHealth: 400, speed: 110, range: 200, damage: 40, fireRate: 1.5, armor: 2, viewRange: 180 },
+  'apc': { maxHealth: 300, speed: 175, range: 140, damage: 10, fireRate: 0.4, armor: 3, viewRange: 180 },
+  'nod_buggy': { maxHealth: 120, speed: 225, range: 140, damage: 10, fireRate: 0.4, armor: 1, viewRange: 200 },
+  'nod_light_tank': { maxHealth: 300, speed: 140, range: 180, damage: 30, fireRate: 1.2, armor: 2, viewRange: 180 },
+  'nod_rocket_infantry': { maxHealth: 45, speed: 50, range: 220, damage: 25, fireRate: 1.0, armor: 0, viewRange: 160 },
+  'nod_turret': { maxHealth: 400, speed: 0, range: 250, damage: 50, fireRate: 1.6, armor: 4, viewRange: 250 },
 };
 
 export class Unit {
@@ -50,10 +50,10 @@ export class Unit {
     this.turretAngle = 0;
   }
 
-  update(units: Unit[], engine: GameEngine) {
+  update(units: Unit[], engine: GameEngine, dt: number) {
     const stats = UNIT_STATS[this.type];
 
-    // Combat Logic
+    // Combat
     if (this.targetUnit) {
       if (this.targetUnit.health <= 0) {
         this.targetUnit = undefined;
@@ -64,62 +64,52 @@ export class Unit {
 
         if (distSq <= stats.range * stats.range) {
           this.turretAngle = Math.atan2(dy, dx);
+          this.path = [];
           this.targetPos = undefined;
-          this.path = []; // Clear path if we stop to fight
           
-          if (Date.now() - this.lastFireTime > stats.fireRate * 16) {
+          if (performance.now() - this.lastFireTime > stats.fireRate * 1000) {
              this.fire(this.targetUnit, engine);
-             this.lastFireTime = Date.now();
+             this.lastFireTime = performance.now();
           }
         } else {
-          // If out of range, move toward target unit (ideally use pathfinding here too, but simple move for now)
           this.targetPos = { ...this.targetUnit.pos };
         }
       }
     }
 
-    // Movement Logic
+    // Movement (Using Delta Time)
+    const moveDist = stats.speed * dt;
     if (this.path.length > 0) {
       const nextWaypoint = this.path[0];
       const dx = nextWaypoint.x - this.pos.x;
       const dy = nextWaypoint.y - this.pos.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 5) {
+      if (dist < moveDist + 1) {
         this.path.shift();
       } else {
-        const vx = (dx / dist) * stats.speed;
-        const vy = (dy / dist) * stats.speed;
-        this.pos.x += vx;
-        this.pos.y += vy;
-        this.angle = Math.atan2(vy, vx);
+        this.pos.x += (dx / dist) * moveDist;
+        this.pos.y += (dy / dist) * moveDist;
+        this.angle = Math.atan2(dy, dx);
       }
     } else if (this.targetPos) {
       const dx = this.targetPos.x - this.pos.x;
       const dy = this.targetPos.y - this.pos.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < 3) {
+      if (dist < moveDist + 1) {
         this.targetPos = undefined;
       } else {
-        const moveSpeed = stats.speed;
-        const nextX = this.pos.x + (dx / dist) * moveSpeed;
-        const nextY = this.pos.y + (dy / dist) * moveSpeed;
-        
-        if (engine.map.isPassable(nextX, nextY)) {
-           this.pos.x = nextX;
-           this.pos.y = nextY;
-           this.angle = Math.atan2(dy, dx);
-        } else {
-           this.targetPos = undefined; 
-        }
+        this.pos.x += (dx / dist) * moveDist;
+        this.pos.y += (dy / dist) * moveDist;
+        this.angle = Math.atan2(dy, dx);
       }
     }
 
     // AI logic for NOD
     if (this.side === 'NOD' && !this.targetUnit && this.path.length === 0 && !this.targetPos) {
       let nearest: Unit | undefined;
-      let minDistSq = 1000 * 1000;
+      let minDistSq = 600 * 600;
       units.forEach(u => {
         if (u.side === 'GDI') {
           const dx = u.pos.x - this.pos.x;
@@ -131,9 +121,7 @@ export class Unit {
           }
         }
       });
-      if (nearest && minDistSq < stats.viewRange * stats.viewRange * 1.5) {
-        this.targetUnit = nearest;
-      }
+      if (nearest) this.targetUnit = nearest;
     }
   }
 

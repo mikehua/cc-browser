@@ -10,6 +10,52 @@ interface Node {
   parent?: Node;
 }
 
+class MinHeap {
+  heap: Node[] = [];
+  push(node: Node) {
+    this.heap.push(node);
+    this.bubbleUp();
+  }
+  pop(): Node | undefined {
+    if (this.size() === 0) return undefined;
+    const top = this.heap[0];
+    const last = this.heap.pop()!;
+    if (this.size() > 0) {
+      this.heap[0] = last;
+      this.sinkDown();
+    }
+    return top;
+  }
+  size() { return this.heap.length; }
+  private bubbleUp() {
+    let index = this.heap.length - 1;
+    while (index > 0) {
+      let parentIdx = Math.floor((index - 1) / 2);
+      if (this.heap[index].f >= this.heap[parentIdx].f) break;
+      [this.heap[index], this.heap[parentIdx]] = [this.heap[parentIdx], this.heap[index]];
+      index = parentIdx;
+    }
+  }
+  private sinkDown() {
+    let index = 0;
+    while (true) {
+      let left = 2 * index + 1;
+      let right = 2 * index + 2;
+      let swap = -1;
+      if (left < this.heap.length) {
+        if (this.heap[left].f < this.heap[index].f) swap = left;
+      }
+      if (right < this.heap.length) {
+        if ((swap === -1 && this.heap[right].f < this.heap[index].f) ||
+            (swap !== -1 && this.heap[right].f < this.heap[left].f)) swap = right;
+      }
+      if (swap === -1) break;
+      [this.heap[index], this.heap[swap]] = [this.heap[swap], this.heap[index]];
+      index = swap;
+    }
+  }
+}
+
 export class Pathfinder {
   static findPath(map: GameMap, startPixel: Vector2, endPixel: Vector2): Vector2[] {
     const startX = Math.floor(startPixel.x / map.tileSize);
@@ -20,9 +66,9 @@ export class Pathfinder {
     if (!map.isTilePassable(endX, endY)) return [];
     if (startX === endX && startY === endY) return [];
 
-    const openList: Node[] = [];
-    const openMap: Map<string, Node> = new Map();
-    const closedSet: Set<string> = new Set();
+    const openList = new MinHeap();
+    const openMap = new Map<string, number>(); // key -> gScore
+    const closedSet = new Set<string>();
 
     const startNode: Node = {
       x: startX,
@@ -34,28 +80,20 @@ export class Pathfinder {
     startNode.f = startNode.h;
 
     openList.push(startNode);
-    openMap.set(`${startX},${startY}`, startNode);
+    openMap.set(`${startX},${startY}`, 0);
 
     let iterations = 0;
-    while (openList.length > 0 && iterations < 1500) {
+    while (openList.size() > 0 && iterations < 2000) {
       iterations++;
-      
-      // Fast lowest-F finding (still O(n) but on a smaller list usually)
-      let bestIdx = 0;
-      for (let i = 1; i < openList.length; i++) {
-        if (openList[i].f < openList[bestIdx].f) bestIdx = i;
-      }
-      
-      const current = openList.splice(bestIdx, 1)[0];
+      const current = openList.pop()!;
       const key = `${current.x},${current.y}`;
-      openMap.delete(key);
-      closedSet.add(key);
 
       if (current.x === endX && current.y === endY) {
         return this.reconstructPath(current, map.tileSize);
       }
 
-      // 8 Neighbors
+      closedSet.add(key);
+
       for (let dx = -1; dx <= 1; dx++) {
         for (let dy = -1; dy <= 1; dy++) {
           if (dx === 0 && dy === 0) continue;
@@ -68,10 +106,10 @@ export class Pathfinder {
           if (!map.isTilePassable(nx, ny)) continue;
           if (closedSet.has(nKey)) continue;
 
-          const gScore = current.g + ((dx === 0 || dy === 0) ? 1 : 1.4);
-          const existing = openMap.get(nKey);
+          const gScore = current.g + ((dx === 0 || dy === 0) ? 1 : 1.414);
+          const existingG = openMap.get(nKey);
 
-          if (!existing) {
+          if (existingG === undefined || gScore < existingG) {
             const newNode: Node = {
               x: nx,
               y: ny,
@@ -82,16 +120,11 @@ export class Pathfinder {
             };
             newNode.f = newNode.g + newNode.h;
             openList.push(newNode);
-            openMap.set(nKey, newNode);
-          } else if (gScore < existing.g) {
-            existing.g = gScore;
-            existing.f = gScore + existing.h;
-            existing.parent = current;
+            openMap.set(nKey, gScore);
           }
         }
       }
     }
-
     return [];
   }
 
@@ -106,9 +139,8 @@ export class Pathfinder {
   }
 
   private static heuristic(x1: number, y1: number, x2: number, y2: number): number {
-    // Octile distance is better for 8-way movement
     const dx = Math.abs(x1 - x2);
     const dy = Math.abs(y1 - y2);
-    return (dx + dy) + (1.4 - 2) * Math.min(dx, dy);
+    return (dx + dy) + (1.414 - 2) * Math.min(dx, dy);
   }
 }
