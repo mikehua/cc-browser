@@ -31,6 +31,7 @@ export class GameEngine {
     const bridgeX = Math.floor(width * 0.4);
     const bridgeY = Math.floor(height * 0.5);
     this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY - 50 });
+    this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY + 50 }); // New Bridge Guard
     this.spawnUnit('nod_rocket_infantry', 'NOD', { x: bridgeX + 200, y: bridgeY - 100 });
 
     const townX = Math.floor(width * 0.8);
@@ -39,6 +40,12 @@ export class GameEngine {
     this.spawnUnit('nod_turret', 'NOD', { x: townX + 100, y: townY + 100 });
     this.spawnUnit('nod_rocket_infantry', 'NOD', { x: townX, y: townY - 150 });
     this.spawnUnit('nod_buggy', 'NOD', { x: townX + 150, y: townY });
+
+    // Additional Nod Forces
+    this.spawnUnit('nod_light_tank', 'NOD', { x: bridgeX + 300, y: bridgeY + 100 }); // Bridge patrol
+    this.spawnUnit('nod_buggy', 'NOD', { x: Math.floor(width * 0.3), y: Math.floor(height * 0.15) }); // North scout
+    this.spawnUnit('nod_rocket_infantry', 'NOD', { x: townX + 200, y: townY - 50 }); // Town reinforcement
+    this.spawnUnit('nod_rocket_infantry', 'NOD', { x: townX + 200, y: townY + 50 }); // Town reinforcement
 
     this.updateShroud();
   }
