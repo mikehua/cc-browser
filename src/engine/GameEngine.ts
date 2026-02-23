@@ -18,10 +18,15 @@ export class GameEngine {
     this.height = height;
     this.map = new GameMap(Math.floor(width / 32), Math.floor(height / 32), 32);
 
+    // Initial GDI Force (South West) - Doubled
     this.spawnUnit('apc', 'GDI', { x: 50, y: height - 100 });
-    this.spawnUnit('humvee', 'GDI', { x: 80, y: height - 150 });
-    this.spawnUnit('minigunner', 'GDI', { x: 120, y: height - 120 });
-    this.spawnUnit('minigunner', 'GDI', { x: 120, y: height - 100 });
+    this.spawnUnit('apc', 'GDI', { x: 50, y: height - 150 });
+    this.spawnUnit('humvee', 'GDI', { x: 100, y: height - 120 });
+    this.spawnUnit('humvee', 'GDI', { x: 100, y: height - 170 });
+    this.spawnUnit('minigunner', 'GDI', { x: 150, y: height - 100 });
+    this.spawnUnit('minigunner', 'GDI', { x: 150, y: height - 120 });
+    this.spawnUnit('minigunner', 'GDI', { x: 150, y: height - 140 });
+    this.spawnUnit('minigunner', 'GDI', { x: 150, y: height - 160 });
 
     const bridgeX = Math.floor(width * 0.4);
     const bridgeY = Math.floor(height * 0.5);

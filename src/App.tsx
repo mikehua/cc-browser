@@ -112,14 +112,20 @@ const App: FC = () => {
         ctx.fillRect(u.pos.x - hpWidth/2, u.pos.y - 25, Math.max(0, hpPercent * hpWidth), 4);
       });
 
-      ctx.fillStyle = '#000';
-      for(let y=0; y<engine.map.height; y++) {
-        for(let x=0; x<engine.map.width; x++) {
-          if (engine.map.shroud[y][x]) ctx.fillRect(x * tileSize, y * tileSize, tileSize, tileSize);
+      // 5. Draw Projectiles
+      engine.projectiles.forEach(p => {
+        const tx = Math.floor(p.pos.x / tileSize);
+        const ty = Math.floor(p.pos.y / tileSize);
+        if (ty >= 0 && ty < engine.map.height && tx >= 0 && tx < engine.map.width) {
+          if (engine.map.shroud[ty][tx]) return;
         }
-      }
+        ctx.fillStyle = p.type === 'shell' || p.type === 'rocket' ? '#fb0' : '#fff';
+        ctx.beginPath();
+        ctx.arc(p.pos.x, p.pos.y, p.type === 'bullet' ? 1.5 : 2.5, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-      pings.forEach(p => {
+      // 6. Draw Shroud
         ctx.strokeStyle = `rgba(0, 255, 0, ${p.life / 20})`;
         ctx.beginPath(); ctx.arc(p.pos.x, p.pos.y, (20 - p.life) * 2, 0, Math.PI * 2); ctx.stroke();
       });
