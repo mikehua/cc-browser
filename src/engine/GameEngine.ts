@@ -31,7 +31,6 @@ export class GameEngine {
     const bridgeX = Math.floor(width * 0.4);
     const bridgeY = Math.floor(height * 0.5);
     this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY - 50 });
-    this.spawnUnit('nod_turret', 'NOD', { x: bridgeX + 150, y: bridgeY + 50 }); // New Bridge Guard
     this.spawnUnit('nod_rocket_infantry', 'NOD', { x: bridgeX + 200, y: bridgeY - 100 });
 
     const townX = Math.floor(width * 0.8);
