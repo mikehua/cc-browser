@@ -129,17 +129,16 @@ export class GameEngine {
   issueMoveCommand(pos: Vector2) {
     const selected = this.units.filter(u => u.isSelected);
     if (selected.length === 0) return;
-    const firstUnit = selected[0];
-    const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, pos);
+    
     selected.forEach(u => {
-      if (groupPath.length > 0) {
-        u.path = [...groupPath];
+      const path = Pathfinder.findPath(this.map, u.pos, pos);
+      u.targetUnit = undefined;
+      if (path.length > 0) {
+        u.path = path;
         u.targetPos = undefined;
-        u.targetUnit = undefined;
       } else {
-        u.targetPos = { ...pos };
         u.path = [];
-        u.targetUnit = undefined;
+        u.targetPos = { ...pos };
       }
     });
   }
@@ -147,16 +146,31 @@ export class GameEngine {
   issueAttackCommand(target: Unit) {
     const selected = this.units.filter(u => u.isSelected);
     if (selected.length === 0) return;
-    const firstUnit = selected[0];
-    const groupPath = Pathfinder.findPath(this.map, firstUnit.pos, target.pos);
+
     selected.forEach(u => {
       u.targetUnit = target;
-      u.targetPos = undefined;
-      if (groupPath.length > 0) u.path = [...groupPath];
+      const path = Pathfinder.findPath(this.map, u.pos, target.pos);
+      if (path.length > 0) {
+        u.path = path;
+        u.targetPos = undefined;
+      } else {
+        u.path = [];
+        u.targetPos = { ...target.pos };
+      }
     });
   }
 
-  getUnitAt(pos: Vector2, radius: number = 20): Unit | undefined {
+  getUnitAt(pos: Vector2, radius: number = 40): Unit | undefined {
+    // Prioritize enemies
+    const nodUnits = this.units.filter(u => u.side === 'NOD');
+    const target = nodUnits.find(u => {
+      const dx = u.pos.x - pos.x;
+      const dy = u.pos.y - pos.y;
+      const hitRadius = u.type.includes('tank') || u.type.includes('turret') ? radius * 1.5 : radius;
+      return (dx * dx + dy * dy) <= hitRadius * hitRadius;
+    });
+    if (target) return target;
+
     return this.units.find(u => {
       const dx = u.pos.x - pos.x;
       const dy = u.pos.y - pos.y;

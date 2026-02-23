@@ -16,13 +16,13 @@ export interface UnitStats {
 }
 
 export const UNIT_STATS: Record<UnitType, UnitStats> = {
-  'minigunner': { maxHealth: 50, speed: 60, range: 120, damage: 8, fireRate: 0.5, armor: 0, viewRange: 150 },
-  'humvee': { maxHealth: 150, speed: 200, range: 160, damage: 12, fireRate: 0.6, armor: 1, viewRange: 220 },
-  'medium_tank': { maxHealth: 400, speed: 110, range: 200, damage: 40, fireRate: 1.5, armor: 2, viewRange: 180 },
-  'apc': { maxHealth: 300, speed: 175, range: 140, damage: 10, fireRate: 0.4, armor: 3, viewRange: 180 },
-  'nod_buggy': { maxHealth: 120, speed: 225, range: 140, damage: 10, fireRate: 0.4, armor: 1, viewRange: 200 },
-  'nod_light_tank': { maxHealth: 300, speed: 140, range: 180, damage: 30, fireRate: 1.2, armor: 2, viewRange: 180 },
-  'nod_rocket_infantry': { maxHealth: 45, speed: 50, range: 220, damage: 25, fireRate: 1.0, armor: 0, viewRange: 160 },
+  'minigunner': { maxHealth: 50, speed: 42, range: 120, damage: 8, fireRate: 0.5, armor: 0, viewRange: 150 },
+  'humvee': { maxHealth: 150, speed: 140, range: 160, damage: 12, fireRate: 0.6, armor: 1, viewRange: 220 },
+  'medium_tank': { maxHealth: 400, speed: 77, range: 200, damage: 40, fireRate: 1.5, armor: 2, viewRange: 180 },
+  'apc': { maxHealth: 300, speed: 123, range: 140, damage: 10, fireRate: 0.4, armor: 3, viewRange: 180 },
+  'nod_buggy': { maxHealth: 120, speed: 158, range: 140, damage: 10, fireRate: 0.4, armor: 1, viewRange: 200 },
+  'nod_light_tank': { maxHealth: 300, speed: 98, range: 180, damage: 30, fireRate: 1.2, armor: 2, viewRange: 180 },
+  'nod_rocket_infantry': { maxHealth: 45, speed: 35, range: 220, damage: 25, fireRate: 1.0, armor: 0, viewRange: 160 },
   'nod_turret': { maxHealth: 400, speed: 0, range: 250, damage: 50, fireRate: 1.6, armor: 4, viewRange: 250 },
 };
 
@@ -57,6 +57,7 @@ export class Unit {
     if (this.targetUnit) {
       if (this.targetUnit.health <= 0) {
         this.targetUnit = undefined;
+        this.targetPos = undefined;
       } else {
         const dx = this.targetUnit.pos.x - this.pos.x;
         const dy = this.targetUnit.pos.y - this.pos.y;
@@ -71,7 +72,8 @@ export class Unit {
              this.fire(this.targetUnit, engine);
              this.lastFireTime = performance.now();
           }
-        } else {
+        } else if (this.path.length === 0) {
+          // Pursuit logic: only if no path exists
           this.targetPos = { ...this.targetUnit.pos };
         }
       }
@@ -106,22 +108,29 @@ export class Unit {
       }
     }
 
-    // AI logic for NOD
-    if (this.side === 'NOD' && !this.targetUnit && this.path.length === 0 && !this.targetPos) {
-      let nearest: Unit | undefined;
-      let minDistSq = 600 * 600;
-      units.forEach(u => {
-        if (u.side === 'GDI') {
-          const dx = u.pos.x - this.pos.x;
-          const dy = u.pos.y - this.pos.y;
-          const d2 = dx * dx + dy * dy;
-          if (d2 < minDistSq) {
-            minDistSq = d2;
-            nearest = u;
+    // AI logic for NOD: Aggressive auto-acquisition
+    if (this.side === 'NOD') {
+      // If target is dead or out of detection range, find a new one
+      if (this.targetUnit && this.targetUnit.health <= 0) {
+        this.targetUnit = undefined;
+      }
+
+      if (!this.targetUnit) {
+        let nearest: Unit | undefined;
+        let minDistSq = stats.viewRange * stats.viewRange * 1.5;
+        units.forEach(u => {
+          if (u.side === 'GDI') {
+            const dx = u.pos.x - this.pos.x;
+            const dy = u.pos.y - this.pos.y;
+            const d2 = dx * dx + dy * dy;
+            if (d2 < minDistSq) {
+              minDistSq = d2;
+              nearest = u;
+            }
           }
-        }
-      });
-      if (nearest) this.targetUnit = nearest;
+        });
+        if (nearest) this.targetUnit = nearest;
+      }
     }
   }
 
