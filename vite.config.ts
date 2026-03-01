@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// Relative base path is most robust for GitHub Pages and Cloudflare
+// Optimized for Custom Root Domain (mikehua.com)
 export default defineConfig({
   plugins: [react()],
-  base: './', 
+  base: '/', 
 })
